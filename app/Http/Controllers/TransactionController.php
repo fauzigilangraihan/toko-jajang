@@ -89,6 +89,7 @@ class TransactionController extends Controller
                 $transaction = Transaction::create([
                     'invoice_number' => $invoiceNumber,
                     'shift_id' => $activeShift->id,
+                    'branch_id' => $user->branch_id,
                     'user_id' => $user->id,
                     'total' => $total,
                     'paid' => $paid,
@@ -111,15 +112,20 @@ class TransactionController extends Controller
                         note: "Penjualan transaksi #{$invoiceNumber}",
                         userId: $user->id
                     );
+
+                    // Add transaction notification for each item sold
+                    session()->flash('stock_notification', [
+                        'type' => 'barang_keluar',
+                        'message' => "Terjual {$data['qty']} {$product->unit} - Transaksi #{$invoiceNumber}",
+                        'product_name' => $product->name,
+                        'price' => $product->price,
+                    ]);
                 }
 
                 return $transaction;
             }); // <-- Perbaikan dilakukan di sini (sebelumnya ]); )
 
-            return redirect()->back()->with([
-                'success' => 'Transaksi berhasil diproses!',
-                'print_receipt_id' => $transaction->id
-            ]);
+            return redirect()->route('transactions.show', $transaction->id)->with('success', 'Transaksi berhasil diproses!');
 
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal memproses transaksi: ' . $e->getMessage());
@@ -131,12 +137,19 @@ class TransactionController extends Controller
      */
     public function history(Request $request): Response
     {
+        $user = $request->user();
         $search = $request->input('search');
+
+        // Filter by branch for cashiers
+        $branchFilter = $user->role === 'kasir' && $user->branch_id ? ['branch_id' => $user->branch_id] : [];
 
         $transactions = Transaction::query()
             ->with(['user:id,name', 'shift:id'])
             ->when($search, function ($query, $search) {
                 $query->where('invoice_number', 'like', "%{$search}%");
+            })
+            ->when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                $q->where($branchFilter);
             })
             ->orderByDesc('created_at')
             ->paginate(15)
@@ -147,15 +160,26 @@ class TransactionController extends Controller
                 DB::raw('SUM(total) as revenue'),
                 DB::raw('COUNT(id) as total_sales')
             )
+            ->when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                $q->where($branchFilter);
+            })
             ->groupBy('date')
             ->orderBy('date', 'ASC')
             ->limit(7)
             ->get();
 
         $summary = [
-            'total_revenue' => Transaction::sum('total'),
-            'today_revenue' => Transaction::whereDate('created_at', today())->sum('total'),
-            'total_count'   => Transaction::count(),
+            'total_revenue' => Transaction::when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                $q->where($branchFilter);
+            })->sum('total'),
+            'today_revenue' => Transaction::whereDate('created_at', today())
+                ->when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                    $q->where($branchFilter);
+                })
+                ->sum('total'),
+            'total_count'   => Transaction::when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                $q->where($branchFilter);
+            })->count(),
         ];
 
         return Inertia::render('Transactions/Index', [

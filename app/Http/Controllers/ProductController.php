@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,13 +17,20 @@ class ProductController extends Controller
      */
     public function index(Request $request): Response
     {
+        $user = $request->user();
         $search = $request->input('search');
+
+        // Filter by branch for cashiers
+        $branchFilter = $user->role === 'kasir' && $user->branch_id ? ['branch_id' => $user->branch_id] : [];
 
         $products = Product::query()
             ->with('category:id,name')
             ->when($search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('barcode', 'like', "%{$search}%");
+            })
+            ->when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                $q->where($branchFilter);
             })
             ->orderBy('name')
             ->paginate(15)
@@ -41,6 +49,7 @@ class ProductController extends Controller
     {
         return Inertia::render('Products/Create', [
             'categories' => Category::orderBy('name')->get(['id', 'name']),
+            'branches' => Branch::active()->get(['id', 'name']),
         ]);
     }
 
@@ -51,6 +60,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => ['nullable', 'exists:categories,id'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:255'],
             'barcode' => ['nullable', 'string', 'max:100', 'unique:products,barcode'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'], // Validasi file gambar maksimal 2MB
@@ -87,6 +97,7 @@ class ProductController extends Controller
         return Inertia::render('Products/Edit', [
             'product' => $product,
             'categories' => Category::orderBy('name')->get(['id', 'name']),
+            'branches' => Branch::active()->get(['id', 'name']),
         ]);
     }
 
@@ -100,13 +111,39 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => ['nullable', 'exists:categories,id'],
+            'branch_id' => ['nullable', 'exists:branches,id'],
             'name' => ['required', 'string', 'max:255'],
             'barcode' => ['nullable', 'string', 'max:100', 'unique:products,barcode,' . $product->id],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
             'unit' => ['required', 'string', 'max:50'],
             'price' => ['required', 'integer', 'min:0'],
+            'stock' => ['required', 'integer', 'min:0'],
             'is_active' => ['boolean'],
         ]);
+
+        // Handle stock change
+        $oldStock = $product->stock;
+        $newStock = $validated['stock'];
+        if ($newStock != $oldStock) {
+            $difference = $newStock - $oldStock;
+            if ($difference > 0) {
+                // Stock increased - create stock movement
+                $product->stockMovements()->create([
+                    'type' => 'in',
+                    'qty' => $difference,
+                    'note' => 'Koreksi stok dari edit produk',
+                    'user_id' => $request->user()->id,
+                ]);
+            } elseif ($difference < 0) {
+                // Stock decreased - create stock movement
+                $product->stockMovements()->create([
+                    'type' => 'out',
+                    'qty' => abs($difference),
+                    'note' => 'Koreksi stok dari edit produk',
+                    'user_id' => $request->user()->id,
+                ]);
+            }
+        }
 
         // Proses upload gambar baru jika kasir mengganti gambar
         if ($request->hasFile('image')) {
@@ -128,11 +165,17 @@ class ProductController extends Controller
      */
     public function destroy(Product $product): RedirectResponse
     {
-        $name = $product->name;
-        $product->delete();
+        try {
+            $name = $product->name;
+            $product->delete();
 
-        return redirect()->route('products.index')
-            ->with('success', "Produk '{$name}' berhasil dihapus.");
+            return redirect()->route('products.index')
+                ->with('success', "Produk '{$name}' berhasil dihapus.");
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle foreign key constraints
+            return redirect()->route('products.index')
+                ->with('error', "Produk '{$product->name}' tidak dapat dihapus karena sudah digunakan dalam transaksi. Gunakan fitur nonaktifkan produk.");
+        }
     }
 
     /**
@@ -160,17 +203,26 @@ class ProductController extends Controller
      */
     public function search(Request $request)
     {
+        $user = $request->user();
         $query = $request->input('query', '');
+
+        // Filter by branch for cashiers
+        $branchFilter = $user->role === 'kasir' && $user->branch_id ? ['branch_id' => $user->branch_id] : [];
 
         $products = Product::query()
             ->where('is_active', true)
-            ->where(function ($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                    ->orWhere('barcode', $query);
+            ->when($query, function ($q) use ($query) {
+                $q->where(function ($subQ) use ($query) {
+                    $subQ->where('name', 'like', "%{$query}%")
+                        ->orWhere('barcode', $query);
+                });
+            })
+            ->when(!empty($branchFilter), function ($q) use ($branchFilter) {
+                $q->where($branchFilter);
             })
             ->orderBy('name')
-            ->limit(20)
-            ->get(['id', 'name', 'barcode', 'price', 'stock', 'unit']);
+            ->limit(50)
+            ->get(['id', 'name', 'barcode', 'price', 'stock', 'unit', 'image']);
 
         return response()->json($products);
     }

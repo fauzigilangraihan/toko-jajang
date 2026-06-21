@@ -1,79 +1,111 @@
-import { Head } from '@inertiajs/react';
+import React from 'react';
+import { Head, Link } from '@inertiajs/react';
 import { useEffect } from 'react';
 
 export default function Receipt({ transaction }) {
-    // Otomatis memicu dialog print browser saat halaman selesai dimuat
-    useEffect(() => {
-        window.print();
-    }, []);
-
     const formatRp = (val) => new Intl.NumberFormat('id-ID').format(val);
 
     return (
-        <div className="bg-white text-black font-mono mx-auto" style={{ width: '58mm', padding: '5mm', fontSize: '12px' }}>
+        <>
             <Head title={`Struk - ${transaction.invoice_number}`} />
 
-            {/* Header Toko */}
-            <div className="text-center mb-4">
-                <h1 className="font-bold text-lg uppercase">Toko Kita React</h1>
-                <p className="text-[10px]">Jl. Laravel Web. No. 11</p>
-                <p className="text-[10px]">Telp: 0812-3456-7890</p>
-            </div>
+            {/* Tombol aksi (disembunyikan saat print) */}
+            <div className="no-print flex justify-center gap-3 p-4 bg-gray-100 min-h-screen items-start pt-8">
+                <div>
+                    <div className="mb-4 flex justify-center gap-3">
+                        <button
+                            onClick={() => window.print()}
+                            className="px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2 text-sm shadow-lg"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            Cetak Struk
+                        </button>
+                        <Link
+                            href={route('transactions.history')}
+                            className="px-6 py-2.5 bg-white text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-colors text-sm shadow border border-slate-200"
+                        >
+                            Kembali
+                        </Link>
+                    </div>
 
-            {/* Info Transaksi */}
-            <div className="border-b border-dashed border-black pb-2 mb-2 text-[10px]">
-                <p>No  : {transaction.invoice_number}</p>
-                <p>Tgl : {new Date(transaction.created_at).toLocaleString('id-ID')}</p>
-                <p>Ksr : {transaction.user.name}</p>
-            </div>
+                    {/* Struk Preview */}
+                    <div
+                        className="bg-white text-black font-mono mx-auto shadow-2xl rounded-lg"
+                        id="receipt-area"
+                        style={{ width: '72mm', padding: '6mm', fontSize: '11px', lineHeight: '1.5' }}
+                    >
+                        {/* Header Toko */}
+                        <div className="text-center mb-3">
+                            <div style={{ fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px' }}>TOKO JAJANG</div>
+                            <div style={{ fontSize: '9px', marginTop: '2px' }}>Jl. Raya Jajang No. 1, Bandung</div>
+                            <div style={{ fontSize: '9px' }}>Telp: 0812-3456-7890</div>
+                            <div style={{ borderBottom: '1px dashed #000', marginTop: '6px', marginBottom: '6px' }}></div>
+                        </div>
 
-            {/* Daftar Item */}
-            <table className="w-full text-[10px] mb-2">
-                <tbody>
-                    {transaction.items.map(item => (
-                        <React.Fragment key={item.id}>
-                            <tr>
-                                <td colSpan="3" className="font-bold">{item.product_name}</td>
-                            </tr>
-                            <tr>
-                                <td className="w-8">{item.qty}x</td>
-                                <td>{formatRp(item.price)}</td>
-                                <td className="text-right">{formatRp(item.qty * item.price)}</td>
-                            </tr>
-                        </React.Fragment>
-                    ))}
-                </tbody>
-            </table>
+                        {/* Info Transaksi */}
+                        <div style={{ fontSize: '9px', marginBottom: '6px' }}>
+                            <div>No  : {transaction.invoice_number}</div>
+                            <div>Tgl : {new Date(transaction.created_at).toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                            <div>Ksr : {transaction.user?.name || '-'}</div>
+                        </div>
+                        <div style={{ borderBottom: '1px dashed #000', marginBottom: '6px' }}></div>
 
-            {/* Ringkasan Pembayaran */}
-            <div className="border-t border-dashed border-black pt-2 text-[10px]">
-                <div className="flex justify-between font-bold">
-                    <span>TOTAL</span>
-                    <span>Rp {formatRp(transaction.total)}</span>
+                        {/* Daftar Item */}
+                        <table style={{ width: '100%', fontSize: '9px', marginBottom: '6px' }}>
+                            <tbody>
+                                {transaction.items.map((item, idx) => (
+                                    <React.Fragment key={item.id}>
+                                        <tr>
+                                            <td colSpan="3" style={{ fontWeight: 'bold', paddingTop: idx > 0 ? '4px' : '0' }}>
+                                                {item.product_name}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ width: '28px' }}>{item.qty}x</td>
+                                            <td>{formatRp(item.price)}</td>
+                                            <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatRp(item.qty * item.price)}</td>
+                                        </tr>
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        {/* Ringkasan Pembayaran */}
+                        <div style={{ borderTop: '1px dashed #000', paddingTop: '6px', fontSize: '9px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '12px', marginBottom: '4px' }}>
+                                <span>TOTAL</span>
+                                <span>Rp {formatRp(transaction.total)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>TUNAI</span>
+                                <span>Rp {formatRp(transaction.paid)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                                <span>KEMBALI</span>
+                                <span>Rp {formatRp(transaction.paid - transaction.total)}</span>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{ borderTop: '1px dashed #000', marginTop: '8px', paddingTop: '6px', textAlign: 'center', fontSize: '9px' }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>*** TERIMA KASIH ***</div>
+                            <div>Barang yang sudah dibeli</div>
+                            <div>tidak dapat dikembalikan.</div>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex justify-between">
-                    <span>TUNAI</span>
-                    <span>Rp {formatRp(transaction.paid)}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span>KEMBALI</span>
-                    <span>Rp {formatRp(transaction.paid - transaction.total)}</span>
-                </div>
             </div>
 
-            {/* Footer */}
-            <div className="text-center mt-6 text-[10px]">
-                <p>Terima Kasih!</p>
-                <p>Barang yang sudah dibeli tidak dapat ditukar/dikembalikan.</p>
-            </div>
-
-            {/* Style khusus untuk menyembunyikan elemen lain saat nge-print */}
-            <style jsx global>{`
+            {/* Style untuk print */}
+            <style>{`
                 @media print {
+                    .no-print { background: white !important; padding: 0 !important; min-height: auto !important; align-items: flex-start !important; }
+                    .no-print > div > div:first-child { display: none !important; }
+                    #receipt-area { box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; }
                     body { background: white; margin: 0; padding: 0; }
-                    @page { margin: 0; }
+                    @page { margin: 0; size: 72mm auto; }
                 }
             `}</style>
-        </div>
+        </>
     );
 }

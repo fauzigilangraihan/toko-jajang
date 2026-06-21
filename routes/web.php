@@ -6,6 +6,8 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\BranchController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -48,6 +50,16 @@ Route::middleware('auth')->group(function () {
 
         // Custom route untuk tambah stok (Restock)
         Route::post('products/{product}/add-stock', [ProductController::class, 'addStock'])->name('products.add-stock');
+
+        // CRUD Users (Manajemen Kasir)
+        Route::resource('users', UserController::class)->except(['show', 'create', 'edit']);
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
+
+        // CRUD Branches (Manajemen Cabang)
+        Route::resource('branches', BranchController::class)->except(['show', 'create', 'edit']);
+        Route::post('branches', [BranchController::class, 'store'])->name('branches.store');
+        Route::put('branches/{branch}', [BranchController::class, 'update'])->name('branches.update');
     });
 
     // ==========================================
