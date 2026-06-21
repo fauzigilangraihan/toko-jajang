@@ -1,16 +1,17 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { useState } from 'react';
 
-export default function Edit({ product, categories }) {
+export default function Edit({ product, categories, branches }) {
     // Perhatikan penggunaan 'post' alih-alih 'put', dan penambahan '_method: put'
     const { data, setData, post, errors, processing } = useForm({
         name: product.name || '',
         barcode: product.barcode || '',
         category_id: product.category_id || '',
+        branch_id: product.branch_id || '',
         unit: product.unit || '',
         price: product.price || '',
+        stock: product.stock || '',
         is_active: product.is_active,
         image: null,
         _method: 'put', // Wajib untuk upload file pada proses update di Laravel
@@ -20,7 +21,6 @@ export default function Edit({ product, categories }) {
     const [imagePreview, setImagePreview] = useState(
         product.image ? `/storage/${product.image}` : null
     );
-    const [isScanning, setIsScanning] = useState(false);
 
     // Menangani perubahan input file gambar
     const handleImageChange = (e) => {
@@ -30,37 +30,6 @@ export default function Edit({ product, categories }) {
             setImagePreview(URL.createObjectURL(file));
         }
     };
-
-    // Efek untuk menyalakan kamera saat mode scanning aktif
-    useEffect(() => {
-        let scanner = null;
-        if (isScanning) {
-            scanner = new Html5QrcodeScanner(
-                "reader",
-                { fps: 10, qrbox: { width: 250, height: 150 } },
-                false
-            );
-
-            scanner.render(
-                (decodedText) => {
-                    // Jika barcode berhasil terbaca
-                    setData('barcode', decodedText);
-                    setIsScanning(false);
-                    scanner.clear();
-                },
-                (errorMessage) => {
-                    // Berjalan di background saat belum ketemu barcode
-                }
-            );
-        }
-
-        // Cleanup: matikan kamera jika komponen ditutup
-        return () => {
-            if (scanner) {
-                scanner.clear().catch(error => console.error("Gagal mematikan scanner", error));
-            }
-        };
-    }, [isScanning]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -121,6 +90,17 @@ export default function Edit({ product, categories }) {
                                 {errors.category_id && <p className="text-rose-500 text-xs mt-1.5">{errors.category_id}</p>}
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Cabang</label>
+                                <select value={data.branch_id} onChange={e => setData('branch_id', e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                    <option value="">-- Semua Cabang --</option>
+                                    {branches.map(branch => (
+                                        <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                    ))}
+                                </select>
+                                {errors.branch_id && <p className="text-rose-500 text-xs mt-1.5">{errors.branch_id}</p>}
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Harga Jual (Rp) <span className="text-rose-500">*</span></label>
@@ -133,21 +113,24 @@ export default function Edit({ product, categories }) {
                                     {errors.unit && <p className="text-rose-500 text-xs mt-1.5">{errors.unit}</p>}
                                 </div>
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Stok <span className="text-rose-500">*</span></label>
+                                <input type="number" min="0" value={data.stock} onChange={e => setData('stock', e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
+                                {errors.stock && <p className="text-rose-500 text-xs mt-1.5">{errors.stock}</p>}
+                                <p className="text-xs text-slate-400 mt-1">Perubahan stok akan tercatat sebagai pergerakan stok.</p>
+                            </div>
                         </div>
 
                         {/* Kolom Kanan */}
                         <div className="space-y-4">
 
-                            {/* Input Barcode + Tombol Kamera */}
+                            {/* Input Barcode */}
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Kode Barcode</label>
-                                <div className="flex gap-2">
-                                    <input type="text" value={data.barcode} onChange={e => setData('barcode', e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ketik atau scan barcode..." />
-                                    <button type="button" onClick={() => setIsScanning(true)} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-medium transition-colors flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 4a2 2 0 012-2h2a1 1 0 010 2H5v2a1 1 0 01-2 0V4zm14 0a2 2 0 00-2-2h-2a1 1 0 100 2h2v2a1 1 0 102 0V4zM3 16a2 2 0 002 2h2a1 1 0 100-2H5v-2a1 1 0 10-2 0v2zm14 0a2 2 0 01-2 2h-2a1 1 0 110-2h2v-2a1 1 0 112 0v2z" clipRule="evenodd" /><path d="M7 6a1 1 0 012 0v8a1 1 0 11-2 0V6zM11 6a1 1 0 10-2 0v8a1 1 0 102 0V6zM15 6a1 1 0 10-2 0v8a1 1 0 102 0V6z" /></svg>
-                                    </button>
-                                </div>
+                                <input type="text" value={data.barcode} onChange={e => setData('barcode', e.target.value)} className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Klik kolom ini, lalu scan dengan alat scanner..." />
                                 {errors.barcode && <p className="text-rose-500 text-xs mt-1.5">{errors.barcode}</p>}
+                                <p className="text-xs text-slate-400 mt-1">Pastikan kursor berada di dalam kotak ini saat menggunakan scanner fisik.</p>
                             </div>
 
                             {/* Foto Produk */}
@@ -186,19 +169,6 @@ export default function Edit({ product, categories }) {
                     </div>
                 </form>
             </div>
-
-            {/* Modal Scanner Kamera */}
-            {isScanning && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl p-6 w-full max-w-lg shadow-2xl relative">
-                        <h3 className="text-lg font-bold mb-4 text-center text-slate-800">Scan Barcode Produk</h3>
-                        <div id="reader" className="w-full overflow-hidden rounded-xl border-2 border-indigo-100"></div>
-                        <button onClick={() => setIsScanning(false)} className="mt-6 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-bold transition-colors">
-                            Tutup Kamera
-                        </button>
-                    </div>
-                </div>
-            )}
         </AuthenticatedLayout>
     );
 }

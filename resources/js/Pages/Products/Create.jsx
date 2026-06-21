@@ -2,9 +2,10 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
-export default function Create({ categories }) {
+export default function Create({ categories, branches }) {
     const { data, setData, post, processing, errors } = useForm({
         category_id: '',
+        branch_id: '',
         name: '',
         barcode: '',
         image: null,
@@ -63,6 +64,17 @@ export default function Create({ categories }) {
                                     ))}
                                 </select>
                                 {errors.category_id && <p className="text-red-500 text-xs mt-1">{errors.category_id}</p>}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-1">Cabang</label>
+                                <select value={data.branch_id} onChange={e => setData('branch_id', e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500">
+                                    <option value="">-- Semua Cabang --</option>
+                                    {branches.map(branch => (
+                                        <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                    ))}
+                                </select>
+                                {errors.branch_id && <p className="text-red-500 text-xs mt-1">{errors.branch_id}</p>}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
